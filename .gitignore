@@ -1,0 +1,26 @@
+# Compiled / build output
+*.class
+target/
+out/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+
+# Runtime data produced by the app
+logs/
+*.log
+backup/
+exports/
+*.dat
+*.ser
+
+# Local config with credentials (commit a db.properties.example instead)
+db.properties
+
+# OS
+Thumbs.db
+.DS_Store
