@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- Project coordinates: groupId = your package root, artifactId = project name -->
+    <groupId>com.payvault</groupId>
+    <artifactId>payvault</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <name>PayVault</name>
+    <description>Digital Wallet &amp; Banking System</description>
+
+    <properties>
+        <!-- Compile for Java 21 (the Temurin JDK you installed) -->
+        <maven.compiler.release>21</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <!-- Class with the main() method, used by "mvn exec:java" -->
+        <main.class>com.payvault.Main</main.class>
+
+        <junit.version>5.11.4</junit.version>
+    </properties>
+
+    <dependencies>
+        <!-- JUnit 5: unit tests for your business logic (test scope = not shipped with the app) -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- M10: MySQL Connector/J goes here -->
+        <!-- M14: JavaFX (javafx-controls) goes here -->
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Runs JUnit 5 tests during "mvn test" -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.5.2</version>
+            </plugin>
+
+            <!-- Lets you run the console app with "mvn exec:java" -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.5.0</version>
+                <configuration>
+                    <mainClass>${main.class}</mainClass>
+                </configuration>
+            </plugin>
+
+            <!-- M14: javafx-maven-plugin goes here -->
+        </plugins>
+    </build>
+</project>
