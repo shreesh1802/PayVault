@@ -2,14 +2,16 @@ package com.payvault.model;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.math.RoundingMode;
+import java.time.temporal.ChronoUnit;
 
 public class Transaction
 {
     private static long nextId = 1;
     private final long id;
-    private final String type;
+    private final TransactionType type;
     private final BigDecimal amount;
-    private final int Counterparty;
+    private final String counterparty;
     private final String note;
     private final LocalDateTime timeStamp;
 
@@ -18,40 +20,34 @@ public class Transaction
         this.id = nextId++;
         this.type = b.type;
         this.amount = b.amount;
-        this.Counterparty = b.Counterparty;
+        this.counterparty = b.counterparty;
         this.note = b.note;
         this.timeStamp = b.timeStamp;
     }
 
     public long getId() { return id;}
-    public String getType() { return type;}
+    public TransactionType getType() { return type;}
     public BigDecimal getAmount() { return amount;}
-    public int getCounterParty() { return Counterparty;}
+    public String getCounterParty() { return counterparty;}
     public String getNote() { return note;}
     public LocalDateTime getTimeStamp() { return timeStamp;}
 
     @Override
     public String toString()
     {
-        return "#" + id + " " + type + "₹" + amount + " " + timeStamp;
+        return "#" + id + " " + type + " " + "₹" + amount.setScale(2, RoundingMode.HALF_UP) + (note != null ? " (" + note + ") " : "") + " " + timeStamp.truncatedTo(ChronoUnit.MINUTES);
     }
 
     public static class Builder
     {
-        private long id;
-        private String type;
+        private TransactionType type;
         private BigDecimal amount;
-        private int Counterparty;
+        private String counterparty;
         private String note;
         private LocalDateTime timeStamp;
 
-        public Builder id(long id)
-        {
-            this.id = id;
-            return this;
-        }
 
-        public Builder type(String type)
+        public Builder type(TransactionType type)
         {
             this.type = type;
             return this;
@@ -62,9 +58,9 @@ public class Transaction
             this.amount = amount;
             return this;
         }
-        public Builder Counterparty(int Counterparty)
+        public Builder counterparty(String counterparty)
         {
-            this.Counterparty = Counterparty;
+            this.counterparty = counterparty;
             return this;
         }
 
@@ -74,13 +70,13 @@ public class Transaction
             return this;
         }
 
-        public Builder timeStamp()
+        public Builder timeStamp(LocalDateTime timeStamp)
         {
             this.timeStamp = timeStamp;
             return this;
         }
 
-        public Transaction Build()
+        public Transaction build()
         {
             if(type == null)
             {
