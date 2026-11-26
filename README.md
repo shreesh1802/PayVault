@@ -4,7 +4,7 @@
 
 **Course:** UCS553 — Enterprise Web Applications (Java)
 **Type:** Semester evaluation project
-**Status:** 🚧 Planning — Phase 1 not started
+**Status:** 🚧 Phase 1 started
 
 ---
 
