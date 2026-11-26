@@ -1,5 +1,6 @@
 package com.payvault;
 
+import com.payvault.exception.WalletException;
 import com.payvault.model.*;
 
 
@@ -7,7 +8,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 public class Main {
-    public static void main(String[] args) {
+    public static void main(String[] args) throws WalletException {
         Transaction T1 = new Transaction.Builder().type(TransactionType.DEPOSIT).amount(new BigDecimal("500")).note("salary").build();
         Transaction T2 = new Transaction.Builder().type(TransactionType.TRANSFER_OUT).amount(new BigDecimal("250.5")).counterparty("C001").build();
 
@@ -32,8 +33,8 @@ public class Main {
 
         a.deposit(new BigDecimal("500"), "salary");
         a.deposit(new BigDecimal("200"));
-        System.out.println("Withdraw 5000: " + a.withdraw(new BigDecimal("5000")));
-        System.out.println("Withdraw 300:  " + a.withdraw(new BigDecimal("300")));
+//        System.out.println("Withdraw 5000: " + a.withdraw(new BigDecimal("5000")));
+//        System.out.println("Withdraw 300:  " + a.withdraw(new BigDecimal("300")));
 
         System.out.println(a);
         for (Transaction t : a.getHistory()) {
@@ -52,11 +53,11 @@ public class Main {
         CurrentAccount c001 = new CurrentAccount("C001", "Ritesh", new BigDecimal("2000"));
         System.out.println("2. " + c001 + " | withdrawable: " + c001.withdrawableAmount());
 
-        boolean ok3 = s001.withdraw(new BigDecimal("4500"));
-        System.out.println("3. Withdraw 4500 from S001: " + ok3 + " | balance: " + s001.getBalance());
+//        boolean ok3 = s001.withdraw(new BigDecimal("4500"));
+//        System.out.println("3. Withdraw 4500 from S001: " + ok3 + " | balance: " + s001.getBalance());
 
-        boolean ok4 = c001.withdraw(new BigDecimal("6500"));
-        System.out.println("4. Withdraw 6500 from C001: " + ok4 + " | balance: " + c001.getBalance() + " | withdrawable: " + c001.withdrawableAmount());
+//        boolean ok4 = c001.withdraw(new BigDecimal("6500"));
+//        System.out.println("4. Withdraw 6500 from C001: " + ok4 + " | balance: " + c001.getBalance() + " | withdrawable: " + c001.withdrawableAmount());
 
         s001.deposit(new BigDecimal("1000"), "salary");
         System.out.println("5. " + s001 + " | history entries: " + s001.getHistory().size());

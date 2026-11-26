@@ -21,6 +21,25 @@ Add an entry whenever you make a choice, hit a bug, or learn something. These no
 - **Alternatives considered:** Just set `balance` to the opening amount and leave the history empty. That's simpler and gives the history only "real" activity.
 - **Why:** The history should fully explain the balance: opening deposit + later deposits − withdrawals = current balance. Without the opening entry, a customer who opened with ₹5000 would see a history that doesn't add up to their balance, and there'd be no record of where that money came from. A zero opening balance isn't recorded because a ₹0 "deposit" carries no information, and `Transaction` amounts should always be real money movements.
 
+### D2 — Order of checks in deposit() and withdraw(): amount → frozen → balance
+- **Date:** 26/11/2026
+- **Decision:** Both methods run their checks in a fixed order, each one throwing straight away if it fails:
+  1. **Amount** (`validateAmount`): null, ≤ 0, or more than 2 decimals → `InvalidAmountException`
+  2. **Frozen**: the account is frozen → `AccountFrozenException`
+  3. **Balance** (`withdraw` only): amount > `withdrawableAmount()` → `InsufficientBalanceException`
+
+  Only after all checks pass do the balance change and the transaction get recorded. So a frozen account given −100 reports *"Amount must be positive"*, not *"Account is frozen"*.
+- **Alternatives considered:**
+  - **Frozen first:** a frozen account rejects everything with "frozen", whatever the amount. It's simple and reveals nothing about the account to someone it's locked away from. But it hides the caller's bug: −100 is wrong for *every* account, and the caller only finds out once the account is unfrozen.
+  - **Balance before frozen:** this would tell a frozen account's user how much money it lacks, which they shouldn't learn while it's locked. And "insufficient balance" would mislead them: adding money wouldn't fix it, since deposits are blocked too.
+  - **Collect all errors and report them together:** useful in forms (M15 validation), but overkill here. One clear reason per failure is enough.
+- **Why:** The checks go from the cheapest and most general to the most specific:
+  - **Amount** depends only on the input. It needs no account state, and a bad amount is a *programming or input mistake* (that's why it's unchecked). That's a bug to report first, wherever it happens.
+  - **Frozen** depends on the account's *state*, not the amount. If the account is frozen, no valid amount can succeed, so there's no point comparing balances.
+  - **Balance** needs a *valid* amount (you can't compute a shortfall from null or −100) and an *active* account, so it has to come last.
+
+  **Key rule:** every check runs *before* `balance` is changed or `recordTransaction` is called. A thrown exception stops the method on that line, so a failed operation changes nothing: no balance change and no history entry. Done-when check 12 (3 history entries) proves this.
+
 ---
 
 ## Experiments
