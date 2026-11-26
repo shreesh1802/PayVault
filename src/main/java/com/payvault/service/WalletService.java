@@ -1,9 +1,8 @@
 package com.payvault.service;
 
-import com.payvault.exception.AccountFrozenException;
-import com.payvault.exception.AccountNotFoundException;
-import com.payvault.exception.InsufficientBalanceException;
+import com.payvault.exception.*;
 import com.payvault.model.Account;
+import com.payvault.util.Validator;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
@@ -43,5 +42,29 @@ public class WalletService
 
     public void unfreeze(String accountNo) throws AccountNotFoundException {
         findAccount(accountNo).unfreeze();
+    }
+
+    public void transfer(String fromNo, String toNo, BigDecimal amount)
+            throws AccountNotFoundException, InvalidTransferException, AccountFrozenException,
+            DailyLimitExceededException, InsufficientBalanceException
+    {
+        amount = Validator.validateAmount(amount);
+
+        Account from = findAccount(fromNo);
+        Account to = findAccount(toNo);
+
+        if (fromNo.equals(toNo))
+        {
+            throw new InvalidTransferException("Cannot transfer to the same account: " + fromNo);
+        }
+
+        if (to.isFrozen())
+        {
+            throw new AccountFrozenException(toNo);
+        }
+
+        from.transferOut(amount, toNo);
+
+        to.transferIn(amount, fromNo);
     }
 }

@@ -35,7 +35,10 @@ public class Transaction
     @Override
     public String toString()
     {
-        return "#" + id + " " + type + " " + "₹" + amount.setScale(2, RoundingMode.HALF_UP) + (note != null ? " (" + note + ")" : "") + " " + timeStamp.truncatedTo(ChronoUnit.MINUTES);
+        return "#" + id + " " + type + " " + "₹" + amount.setScale(2, RoundingMode.HALF_UP)
+                + (note != null ? " (" + note + ")" : "")
+                + (counterparty != null ? " [" + counterparty + "]" : "")
+                + " " + timeStamp.truncatedTo(ChronoUnit.MINUTES);
     }
 
     public static class Builder
