@@ -28,7 +28,7 @@ public class Transaction
     public long getId() { return id;}
     public TransactionType getType() { return type;}
     public BigDecimal getAmount() { return amount;}
-    public String getCounterParty() { return counterparty;}
+    public String getCounterparty() { return counterparty;}
     public String getNote() { return note;}
     public LocalDateTime getTimeStamp() { return timeStamp;}
 
