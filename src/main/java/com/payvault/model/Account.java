@@ -2,7 +2,7 @@ package com.payvault.model;
 
 import com.payvault.exception.AccountFrozenException;
 import com.payvault.exception.InsufficientBalanceException;
-import com.payvault.exception.InvalidAmountException;
+import com.payvault.util.Validator;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -26,10 +26,15 @@ public abstract class Account {
     public Account(String accountNo, String holderName, BigDecimal openingBalance) {
         this.accountNo = accountNo;
         this.holderName = holderName;
+
+        if (openingBalance.compareTo(BigDecimal.ZERO) != 0) {
+            openingBalance = Validator.validateAmount(openingBalance);
+        }
+
         this.balance = openingBalance.setScale(2);
 
-        if (openingBalance.compareTo(BigDecimal.ZERO) > 0) {
-            recordTransaction(TransactionType.DEPOSIT, this.balance , "Opening Balance");
+        if (this.balance.compareTo(BigDecimal.ZERO) > 0) {
+            recordTransaction(TransactionType.DEPOSIT, this.balance, "Opening Balance");
         }
     }
 
@@ -38,9 +43,9 @@ public abstract class Account {
         deposit(amount, null);
     }
 
-    public void deposit(BigDecimal amount, String note) throws AccountFrozenException {
-        validateAmount(amount);
-        amount = amount.setScale(2);
+    public void deposit(BigDecimal amount, String note) throws AccountFrozenException
+    {
+        amount = Validator.validateAmount(amount);
 
         if (frozen)
         {
@@ -53,8 +58,7 @@ public abstract class Account {
 
     public void withdraw(BigDecimal amount) throws AccountFrozenException, InsufficientBalanceException
     {
-        validateAmount(amount);
-        amount = amount.setScale(2);
+        amount = Validator.validateAmount(amount);
 
         if(frozen)
         {
@@ -82,21 +86,7 @@ public abstract class Account {
         history.add(t);
     }
 
-    private void validateAmount(BigDecimal amount)
-    {
-        if(amount == null)
-        {
-            throw new InvalidAmountException("invalid amount");
-        }
-        if(amount.compareTo(BigDecimal.ZERO) <= 0)
-        {
-            throw new InvalidAmountException("Amount must be positive: " + amount);
-        }
-        if(amount.stripTrailingZeros().scale() > 2)
-        {
-            throw new InvalidAmountException("Amount can have at most 2 decimal places: " + amount);
-        }
-    }
+
 
     public String getAccountNo() { return accountNo; }
     public String getHolderName() { return holderName; }

@@ -129,6 +129,7 @@ The full feature-by-feature plan is in [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.
 Design decisions and bugs found along the way are recorded in [docs/DESIGN.md](docs/DESIGN.md).
 Course-slide references for every milestone and topic are in [docs/REFERENCES.md](docs/REFERENCES.md).
 Milestone task cards live in [docs/tasks/](docs/tasks/).
+Exam-ready concept notes are in [docs/NOTES.md](docs/NOTES.md).
 
 ## 8. Syllabus Coverage
 
