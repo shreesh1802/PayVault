@@ -1,7 +1,6 @@
 package com.payvault.model;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 
 public class CurrentAccount extends Account
 {

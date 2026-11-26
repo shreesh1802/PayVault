@@ -5,9 +5,9 @@ import java.math.RoundingMode;
 
 public class SavingsAccount extends Account implements InterestBearing
 {
-    private static final BigDecimal MinBalance = new BigDecimal("1000");
-    private static final BigDecimal AnnualRate = new BigDecimal("0.04");
-    private static final BigDecimal Months = new BigDecimal("12");
+    private static final BigDecimal MIN_BALANCE = new BigDecimal("1000");
+    private static final BigDecimal ANNUAL_RATE = new BigDecimal("0.04");
+    private static final BigDecimal MONTHS = new BigDecimal("12");
 
     public SavingsAccount(String accountNo, String holderName)
     {
@@ -22,7 +22,7 @@ public class SavingsAccount extends Account implements InterestBearing
     @Override
     public BigDecimal withdrawableAmount() {
 
-        BigDecimal availableBalance = getBalance().subtract(MinBalance);
+        BigDecimal availableBalance = getBalance().subtract(MIN_BALANCE);
         return availableBalance.max(BigDecimal.ZERO);
     }
 
@@ -30,6 +30,6 @@ public class SavingsAccount extends Account implements InterestBearing
     @Override
     public BigDecimal calculateInterest()
     {
-        return getBalance().multiply(AnnualRate).divide(Months, 2 , RoundingMode.HALF_UP);
+        return getBalance().multiply(ANNUAL_RATE).divide(MONTHS, 2 , RoundingMode.HALF_UP);
     }
 }

@@ -56,7 +56,7 @@ public abstract class Account
 
     public abstract BigDecimal withdrawableAmount();
 
-    public void recordTransaction(TransactionType type,BigDecimal amount, String note)
+    private void recordTransaction(TransactionType type,BigDecimal amount, String note)
     {
         Transaction t = new Transaction.Builder().type(type).amount(amount).note(note).build();
         history.add(t);

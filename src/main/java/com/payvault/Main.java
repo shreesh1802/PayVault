@@ -69,7 +69,7 @@ public class Main {
         List<Account> accounts = List.of(s001, c001);
         System.out.println("7. Polymorphism");
         for (Account acc : accounts) {
-            System.out.println("    " + acc.getAccountNo() + "withdrawable: " + acc.withdrawableAmount());
+            System.out.println("    " + acc.getAccountNo() + " " + "withdrawable: " + acc.withdrawableAmount());
         }
 
         try {
