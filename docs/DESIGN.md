@@ -62,6 +62,24 @@ Add an entry whenever you make a choice, hit a bug, or learn something. These no
   - **Catching and printing exceptions inside the service:** the service doesn't know who's calling. A console should print, a JavaFX screen should show an alert (M15). Catching here would hide the failure from the caller.
 - **Why:** Each class has one job. `Account` owns its data **and** the rules that protect it (encapsulation), so they can never be skipped. `WalletService` is the single entry point the rest of the app uses: Main now, the UI later, transfers in M3. Keeping it thin means M3 (transfers) and M11 (database) only add new behaviour there, without touching the rules.
 
+### D5 — A transfer checks everything that can fail before any money moves
+- **Date:** 27/11/2026
+- **Decision:** `WalletService.transfer(from, to, amount)` runs in this order:
+  1. validate the amount (`Validator`)
+  2. find both accounts
+  3. reject a transfer to the same account (`fromNo.equals(toNo)`)
+  4. reject a **frozen destination**
+  5. `from.transferOut(...)`: source frozen → daily limit → funds → debit
+  6. `to.transferIn(...)`: credit
+
+  After step 5 takes the money, **nothing is allowed to fail**. Every check that could fail has already run.
+- **Alternatives considered:**
+  - **No step 4, relying on `transferIn`'s own frozen check:** the check would still happen, but too late. Transferring ₹100 from S001 into a frozen S002: `transferOut` succeeds and S001 drops by ₹100, then `transferIn` throws `AccountFrozenException`. The exception propagates out of `transfer`, S002 never receives the money, and **₹100 has vanished**. Done-when check 5 proves this doesn't happen: S001 is still 50000.00.
+  - **Undo on failure** (catch the exception after the debit and put the money back with another `transferIn`): works for this case, but the undo itself could fail, and the history would show a TRANSFER_OUT that never really happened. Preventing the problem is simpler than repairing it.
+  - **Implement transfer as `withdraw()` + `deposit()`:** the history would say WITHDRAWAL/DEPOSIT with no counterparty, so nobody could tell where the money went, and withdrawals don't count towards the daily limit, so the limit could be bypassed.
+- **Why:** The rule for M3 is that **money is never created or lost: either both accounts change, or neither does**. Since the debit and the credit are two separate steps, the only safe design in plain Java is to make the second step unable to fail. Step 4 is the one check that belongs to the *destination* but has to run *before* the debit, which is why it lives in `WalletService` and not only in `Account`. Done-when check 11 confirms that the total of all balances (67000.00) is the same before and after.
+- **What this still doesn't protect against:** a failure **outside** Java's exceptions, such as the program crashing, the power going off, or the process being killed between step 5 and step 6. S001 would already be debited in memory (and later in the database), and the credit would never happen. Ordering checks can't fix that. It needs a real **transaction**: in M12 the transfer runs inside a database transaction with `setAutoCommit(false)`, and either `commit()` saves both updates together or `rollback()` cancels both (ACID atomicity).
+
 ---
 
 ## Experiments
@@ -117,4 +135,16 @@ Planned experiments:
 - **Date:** 26/11/2026
 - **Symptom:** After changing `withdraw()` to return `void`, IntelliJ's build failed with 18–20 errors, including *cannot find symbol: class TransactionType* in `Transaction.java` and `Account.java`. Those files hadn't changed, and `TransactionType.java` was still there.
 - **Cause:** Not a code problem. The only real errors were in `Main` (it still used `withdraw()`'s old `boolean` result). IntelliJ builds incrementally and caches compiled classes; when part of a build fails, its cache can go stale and report unrelated classes as missing. `mvn clean compile` (which always starts from scratch) showed only the real `Main` errors.
-- **Fix:** Fixed the real errors in `Main` (commented out the old `boolean` checks, added `throws WalletException` to `main`), then **Build → Rebuild Project** to throw away IntelliJ's cache. **Lesson:** when the IDE's errors don't make sense, compare with a clean Maven build: Maven's errors are the ones to trust.
+- **Fix:** Fixed the real errors in `Main` (commented out the old `boolean` checks, added `throws WalletException` to `main`), then **Build → Rebuild Project** to throw away IntelliJ's cache. **Lesson:** when the IDE's errors don't make sense, compare with a clean Maven build: Maven's errors are the ones to trust. *(Happened again on 27/11 with 91 errors during M3; the same fix worked.)*
+
+### B2 — Received transfers counted towards the receiver's daily limit
+- **Date:** 27/11/2026
+- **Symptom:** In `runM3Checks`, check 13 printed `C001 sent today: 54000.00` although C001 never sent anything; it only **received** three transfers. C001's history showed `TRANSFER_OUT [S001]` for money coming **in**.
+- **Cause:** `Account.transferIn` was written by copying `transferOut`, and the transaction type was never changed: it recorded `TransactionType.TRANSFER_OUT`. `getTransferredToday()` adds up every `TRANSFER_OUT` from today, so it counted the received money as sent. Real impact: C001 would have been blocked from sending its own money by the limit.
+- **Fix:** `transferIn` records `TransactionType.TRANSFER_IN`. Check 13 now prints `0.00`, and C001's history shows `TRANSFER_IN`. **Lesson:** copy-pasted code is where bugs hide. After copying a method, check every line that should differ. And a test that checks a value you *don't* expect to change (check 13) catches bugs that the obvious tests miss.
+
+### B3 — The daily limit printed as ₹50000 instead of ₹50000.00
+- **Date:** 27/11/2026
+- **Symptom:** The `DailyLimitExceededException` message said `Daily transfer limit ₹50000 exceeded`, without the `.00` that every other amount has.
+- **Cause:** The constant was created with the **`double`** constructor: `new BigDecimal(50000.00)`. To Java, `50000.00` is just the `double` `50000.0`, so the decimals written in the source are lost, and the BigDecimal becomes `50000` (scale 0). It happens to be exact for 50000, but with a value like `0.1` the `double` constructor gives the inaccurate `0.1000000000000000055511…`, exactly as E1 showed.
+- **Fix:** `new BigDecimal("50000.00")`, using the **String** constructor, which keeps exactly the digits written. **Lesson:** the E1 rule applies to constants too: a `BigDecimal` is always created from a `String`.

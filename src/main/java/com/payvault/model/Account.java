@@ -19,7 +19,7 @@ public abstract class Account {
     private final String holderName;
     private BigDecimal balance;
     private boolean frozen = false;
-    private static final BigDecimal DAILY_TRANSFER_LIMIT = new BigDecimal(50000.00);
+    private static final BigDecimal DAILY_TRANSFER_LIMIT = new BigDecimal("50000.00");
 
 
     private final List<Transaction> history = new ArrayList<>();
@@ -79,7 +79,7 @@ public abstract class Account {
         checkNotFrozen();
 
         balance = balance.add(amount);
-        recordTransaction(TransactionType.TRANSFER_OUT, amount, null, fromAccountNo);
+        recordTransaction(TransactionType.TRANSFER_IN, amount, null, fromAccountNo);
     }
 
 
