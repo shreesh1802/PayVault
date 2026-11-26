@@ -40,6 +40,28 @@ Add an entry whenever you make a choice, hit a bug, or learn something. These no
 
   **Key rule:** every check runs *before* `balance` is changed or `recordTransaction` is called. A thrown exception stops the method on that line, so a failed operation changes nothing: no balance change and no history entry. Done-when check 12 (3 history entries) proves this.
 
+### D3 — Which exceptions are checked and which are unchecked
+- **Date:** 27/11/2026
+- **Decision:**
+  - **Checked** (`WalletException` and subclasses): `InsufficientBalanceException`, `AccountNotFoundException`, `AccountFrozenException`, `DailyLimitExceededException`
+  - **Unchecked** (`RuntimeException`): `InvalidAmountException`, and Java's own `IllegalArgumentException` for adding a duplicate account
+- **Alternatives considered:**
+  - **Everything checked:** every `deposit` call would have to handle `InvalidAmountException`, even where the amount is a constant like `new BigDecimal("500")` that can never be invalid. The `try`/`catch` blocks would be noise, and people start writing empty `catch {}`s to silence the compiler.
+  - **Everything unchecked** (the style of Spring and many modern libraries): less code, but the compiler would no longer remind anyone that a withdrawal can fail for lack of money, and the UI could forget to show that case.
+- **Why:** The test is **"whose fault is it, and can the caller recover?"**
+  - **Checked = a normal business situation** that a correct program will meet at runtime: a customer really can be short of money, type a wrong account number, or use a frozen account. The caller *must* plan for it (show a message, ask again), so the compiler enforces handling.
+  - **Unchecked = a programming mistake** that a correct program never makes: passing `null` or −100 to `deposit`, or registering the same account twice. The fix is to correct the calling code (or validate input earlier, in the UI in M15), not to catch the exception.
+  - All checked ones share the parent `WalletException`, so a caller that doesn't care about the details can catch everything with one `catch (WalletException e)`. One that does care can catch the specific subclass first.
+
+### D4 — WalletService finds the account, Account enforces the rules
+- **Date:** 27/11/2026
+- **Decision:** `WalletService` keeps all accounts in a `HashMap<String, Account>` keyed by account number. Each of its methods only (1) looks up the account with `findAccount`, which throws `AccountNotFoundException` if it's missing, and (2) **delegates** to the account's own method. It contains no amount, frozen or balance checks and catches nothing; checked exceptions propagate to the caller through its `throws` clauses.
+- **Alternatives considered:**
+  - **A `List<Account>` searched with a loop:** works, but every lookup checks accounts one by one (O(n)), and duplicates aren't easy to detect. A `HashMap` gives O(1) lookup by key and `containsKey` for the duplicate check.
+  - **Putting the rules in the service** (`if (account.isFrozen()) throw …` inside `WalletService`): then the rules exist in two places, and anyone calling `account.withdraw()` directly would bypass them.
+  - **Catching and printing exceptions inside the service:** the service doesn't know who's calling. A console should print, a JavaFX screen should show an alert (M15). Catching here would hide the failure from the caller.
+- **Why:** Each class has one job. `Account` owns its data **and** the rules that protect it (encapsulation), so they can never be skipped. `WalletService` is the single entry point the rest of the app uses: Main now, the UI later, transfers in M3. Keeping it thin means M3 (transfers) and M11 (database) only add new behaviour there, without touching the rules.
+
 ---
 
 ## Experiments
@@ -63,6 +85,16 @@ Add an entry whenever you make a choice, hit a bug, or learn something. These no
   ```
 - **What I learned:** `double` stores numbers in binary, and 0.1 has no exact binary form, so tiny errors appear even in simple sums. That's why PayVault uses `BigDecimal` for all money. The third line shows that `BigDecimal` only helps if it's built from a **String**: the `double` constructor copies the already-inaccurate binary value. So money values are always written as `new BigDecimal("...")`.
 
+### E2 — Depositing 10.500 shows a balance of 5010.500
+- **Date:** 27/11/2026
+- **What I expected:** S001 (opened with 5000) would show `5010.50` after depositing `10.500`, since `10.500` and `10.50` are the same amount.
+- **What actually happened:**
+  ```
+  balance after deposit 10.500        → 5010.500
+  withdraw 4500 → shortfall message   → short by ₹489.500
+  ```
+- **What I learned:** A `BigDecimal` stores two things: the digits and a **scale** (the number of digits after the point). `10.500` has scale 3, and `add`/`subtract` keep the larger scale, so the 3 decimals spread into the balance and everything computed from it. It's the same reason `new BigDecimal("2.0").equals(new BigDecimal("2.00"))` is `false` (different scales) while `compareTo` returns 0 (same value). Fix: after `validateAmount` has guaranteed ≤ 2 real decimals, normalise the amount once with `setScale(2)`. That can't lose digits, so no `RoundingMode` is needed, and every balance and transaction stays at exactly 2 decimals. *(Fix still to be applied in `Account`.)*
+
 Planned experiments:
 - [ ] Remove `serialVersionUID`, change the class, load old data → what happens?
 - [ ] Add a `ConsoleHandler` without `setUseParentHandlers(false)` → what happens?
@@ -73,10 +105,16 @@ Planned experiments:
 
 ## Bugs
 
-Template:
-
-### B1 — <symptom>
+<!-- Template for new bugs:
+### B? — <symptom>
 - **Date:**
 - **Symptom:**
 - **Cause:**
 - **Fix:**
+-->
+
+### B1 — IntelliJ reports "cannot find symbol: class TransactionType"
+- **Date:** 26/11/2026
+- **Symptom:** After changing `withdraw()` to return `void`, IntelliJ's build failed with 18–20 errors, including *cannot find symbol: class TransactionType* in `Transaction.java` and `Account.java`. Those files hadn't changed, and `TransactionType.java` was still there.
+- **Cause:** Not a code problem. The only real errors were in `Main` (it still used `withdraw()`'s old `boolean` result). IntelliJ builds incrementally and caches compiled classes; when part of a build fails, its cache can go stale and report unrelated classes as missing. `mvn clean compile` (which always starts from scratch) showed only the real `Main` errors.
+- **Fix:** Fixed the real errors in `Main` (commented out the old `boolean` checks, added `throws WalletException` to `main`), then **Build → Rebuild Project** to throw away IntelliJ's cache. **Lesson:** when the IDE's errors don't make sense, compare with a clean Maven build: Maven's errors are the ones to trust.
