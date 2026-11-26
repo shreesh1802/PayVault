@@ -26,10 +26,10 @@ public abstract class Account {
     public Account(String accountNo, String holderName, BigDecimal openingBalance) {
         this.accountNo = accountNo;
         this.holderName = holderName;
-        this.balance = openingBalance;
+        this.balance = openingBalance.setScale(2);
 
         if (openingBalance.compareTo(BigDecimal.ZERO) > 0) {
-            recordTransaction(TransactionType.DEPOSIT, openingBalance, "Opening Balance");
+            recordTransaction(TransactionType.DEPOSIT, this.balance , "Opening Balance");
         }
     }
 
@@ -40,6 +40,8 @@ public abstract class Account {
 
     public void deposit(BigDecimal amount, String note) throws AccountFrozenException {
         validateAmount(amount);
+        amount = amount.setScale(2);
+
         if (frozen)
         {
             throw new AccountFrozenException(accountNo);
@@ -52,6 +54,7 @@ public abstract class Account {
     public void withdraw(BigDecimal amount) throws AccountFrozenException, InsufficientBalanceException
     {
         validateAmount(amount);
+        amount = amount.setScale(2);
 
         if(frozen)
         {
