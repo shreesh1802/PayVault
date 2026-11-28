@@ -80,6 +80,22 @@ Add an entry whenever you make a choice, hit a bug, or learn something. These no
 - **Why:** The rule for M3 is that **money is never created or lost: either both accounts change, or neither does**. Since the debit and the credit are two separate steps, the only safe design in plain Java is to make the second step unable to fail. Step 4 is the one check that belongs to the *destination* but has to run *before* the debit, which is why it lives in `WalletService` and not only in `Account`. Done-when check 11 confirms that the total of all balances (67000.00) is the same before and after.
 - **What this still doesn't protect against:** a failure **outside** Java's exceptions, such as the program crashing, the power going off, or the process being killed between step 5 and step 6. S001 would already be debited in memory (and later in the database), and the credit would never happen. Ordering checks can't fix that. It needs a real **transaction**: in M12 the transfer runs inside a database transaction with `setAutoCommit(false)`, and either `commit()` saves both updates together or `rollback()` cancels both (ACID atomicity).
 
+### D6 — Two accounts are equal when their account numbers are equal
+- **Date:** 29/11/2026
+- **Decision:** `Account` overrides `equals` and `hashCode`, and both use **only `accountNo`**:
+  - `equals`: same object → `true`; not an `Account` (or `null`) → `false`; otherwise `accountNo.equals(other.accountNo)`
+  - `hashCode`: `Objects.hash(accountNo)`
+  So `new SavingsAccount("S001", "Aman", 5000)` and `new SavingsAccount("S001", "Someone Else", 100)` are equal, even though they are two different objects (`==` is `false`).
+- **Alternatives considered:**
+  - **Don't override at all** (keep `Object`'s versions, which compare memory addresses): then two objects that represent the same bank account count as different. A `HashSet<Account>` could hold "S001" twice, and `contains` would fail for any object except the exact one that was added (see E3).
+  - **Compare every field** (number, name, balance, frozen, history): the account would stop being "equal to itself" the moment money moved, which makes no sense for a bank account. Worse, its `hashCode` would **change** after every deposit (next point).
+  - **Compare number + holder name:** the name isn't what identifies an account; a holder could be renamed and it's still the same account. The bank's identifier is the account number, and `WalletService` already uses it as the `HashMap` key.
+- **Why:**
+  - **Identity, not state.** An account *is* its number. The balance, name and history are its **state**, which changes over time, but it's still the same account.
+  - **`hashCode` must not change while the object is in a hash collection.** A `HashSet`/`HashMap` stores each object in a "bucket" chosen by its `hashCode` **at the moment it was added**. If `hashCode` used the balance, a deposit would change it, the set would look in the wrong bucket, and `contains(account)` would return `false` for an account that is in the set; you couldn't even `remove` it. `accountNo` is `final`, so the hash can never change.
+  - **`equals` and `hashCode` must always be overridden together.** The contract: if `a.equals(b)` then `a.hashCode() == b.hashCode()`. A hash collection first uses `hashCode` to pick the bucket and only then calls `equals` inside it. With `equals` overridden but not `hashCode`, two equal accounts usually get different hash codes, land in different buckets, and are never compared, so the set keeps both.
+  - **`instanceof` instead of `getClass()`:** a `SavingsAccount` and a `CurrentAccount` with the same number count as equal. Account numbers are unique across all account types, so this is correct, and it keeps `equals` symmetric for subclasses. (`instanceof` is fine here; M1's "no `instanceof`" rule was about choosing *behaviour*, and `equals` is the standard exception.)
+
 ---
 
 ## Experiments
@@ -112,6 +128,21 @@ Add an entry whenever you make a choice, hit a bug, or learn something. These no
   withdraw 4500 → shortfall message   → short by ₹489.500
   ```
 - **What I learned:** A `BigDecimal` stores two things: the digits and a **scale** (the number of digits after the point). `10.500` has scale 3, and `add`/`subtract` keep the larger scale, so the 3 decimals spread into the balance and everything computed from it. It's the same reason `new BigDecimal("2.0").equals(new BigDecimal("2.00"))` is `false` (different scales) while `compareTo` returns 0 (same value). Fix: after `validateAmount` has guaranteed ≤ 2 real decimals, normalise the amount once with `setScale(2)`. That can't lose digits, so no `RoundingMode` is needed, and every balance and transaction stays at exactly 2 decimals. **Fixed (27/11/2026):** `deposit` and `withdraw` call `amount = amount.setScale(2)` right after `validateAmount`, and the constructor stores `openingBalance.setScale(2)` as the balance (and records that same value in the opening transaction). Running `Main` now gives `5010.50`, `489.50` and `-5000.00`.
+
+### E3 — Two "S001" objects in a HashSet, and timestamps that tie
+- **Date:** 29/11/2026
+- **Part A: `HashSet` before and after `equals`/`hashCode`**
+  - **What I expected:** the set would notice that both objects are account S001 and keep only one.
+  - **What actually happened** (two `new SavingsAccount("S001", …)` objects with different names and balances):
+    ```
+    without equals/hashCode (commit c15dc43):  equals → false | HashSet size → 2 | set.contains(other S001) → false
+    with equals/hashCode (M4):                 equals → true  | HashSet size → 1
+    ```
+  - **What I learned:** by default, `equals` is inherited from `Object` and is the same as `==`: it compares **memory addresses**, not content. The `HashSet` had no way of knowing the two objects mean the same account, so it kept both. Once `equals` says "same number = same account" and `hashCode` gives both the same hash, the set puts them in the same bucket, compares them, and rejects the duplicate. (See D6.)
+- **Part B: ordering transactions by timestamp**
+  - **What I expected:** every transaction gets a different `LocalDateTime.now()`, so sorting by timestamp gives the true order.
+  - **What actually happened:** in a loop of 1000 back-to-back `LocalDateTime.now()` calls, **999 returned exactly the same value** as the previous call. An early version of "newest first" sorted by timestamp and put `#4 DEPOSIT 500` at the top instead of the real newest, `#11 TRANSFER_OUT 300`, because most transactions created in one run had identical timestamps.
+  - **What I learned:** the timestamp has nanosecond *digits*, but on Windows the clock only *updates* every few milliseconds, and the code runs much faster than that. So timestamps can't break ties. The **transaction id** is unique and only ever goes up (it's the `static` counter from M1), so `getHistoryNewestFirst` and the tie-break in `getHistoryByAmount` use the id. Timestamps are still right for grouping by **month** (`StatementService`), where a few milliseconds don't matter.
 
 Planned experiments:
 - [ ] Remove `serialVersionUID`, change the class, load old data → what happens?

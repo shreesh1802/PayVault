@@ -11,9 +11,22 @@ import com.payvault.model.Account;
 import com.payvault.model.CurrentAccount;
 import com.payvault.model.SavingsAccount;
 import com.payvault.model.Transaction;
+import com.payvault.model.TransactionType;
+import com.payvault.service.StatementService;
 import com.payvault.service.WalletService;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.YearMonth;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.ConcurrentModificationException;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 
 public class Main
 {
@@ -22,6 +35,8 @@ public class Main
         runM2Checks();
         System.out.println();
         runM3Checks();
+        System.out.println();
+        runM4Checks();
     }
 
     private static void runM2Checks() throws WalletException
@@ -290,5 +305,158 @@ public class Main
         }
 
         // 15. runM2Checks() above still prints exactly what it did at the end of M2
+    }
+
+    // ==================== M4: collections ====================
+    private static void runM4Checks() throws WalletException
+    {
+        WalletService service = new WalletService();
+        service.addAccount(new SavingsAccount("S001", "Aman", new BigDecimal("10000")));
+        service.addAccount(new CurrentAccount("C001", "Ritesh", new BigDecimal("5000")));
+        service.addAccount(new SavingsAccount("S002", "Priya", new BigDecimal("3000")));
+
+        service.deposit("S001", new BigDecimal("500"), "salary");
+        service.withdraw("S001", new BigDecimal("300"));
+        service.transfer("S001", "C001", new BigDecimal("1500"));
+        service.transfer("S001", "S002", new BigDecimal("700"));
+        service.deposit("S001", new BigDecimal("2500"), "bonus");
+        service.transfer("S001", "C001", new BigDecimal("300"));
+
+        Account s001 = service.findAccount("S001");
+
+        System.out.println("=== M4: Collections ===");
+
+        // 1. Balance and history size
+        System.out.println("1. " + s001 + " | history entries: " + s001.getHistory().size());
+
+        // 2. Last 3 transactions, newest first (ArrayDeque)
+        System.out.println("2. Last 3 transactions:");
+        printTransactions(s001.getRecentTransaction(3));
+
+        // 3. Asking for more than exist
+        System.out.println("3. getRecentTransactions(10) returned " + s001.getRecentTransaction(10).size() + " entries");
+
+        // 4. Sorted by amount, largest first; equal amounts older first (Comparator chain)
+        System.out.println("4. History by amount:");
+        printTransactions(s001.getHistoryByAmount());
+
+        // 5. The original history is untouched by the sort
+        System.out.println("5. getHistory() still starts with: " + s001.getHistory().get(0));
+
+        // 6. Newest first (anonymous Comparator class)
+        System.out.println("6. Newest transaction: " + s001.getHistoryNewestFirst().get(0));
+
+        // 7. Unique counterparties (HashSet)
+        Set<String> counterparties = s001.getCounterParties();
+        System.out.println("7. Counterparties: " + counterparties + " | size: " + counterparties.size()
+                + " | contains C001: " + counterparties.contains("C001")
+                + " | contains X999: " + counterparties.contains("X999"));
+
+        // 8. Monthly statement (TreeMap): months come out sorted although added out of order
+        List<Transaction> backdated = List.of(
+                backdatedTransaction(TransactionType.DEPOSIT, "1000", LocalDateTime.of(2026, 11, 5, 10, 0)),
+                backdatedTransaction(TransactionType.WITHDRAWAL, "200", LocalDateTime.of(2026, 9, 12, 10, 0)),
+                backdatedTransaction(TransactionType.DEPOSIT, "300", LocalDateTime.of(2026, 11, 20, 10, 0)),
+                backdatedTransaction(TransactionType.DEPOSIT, "50", LocalDateTime.of(2026, 10, 1, 10, 0)),
+                backdatedTransaction(TransactionType.TRANSFER_OUT, "100", LocalDateTime.of(2026, 9, 30, 10, 0)));
+
+        TreeMap<YearMonth, List<Transaction>> statement = new TreeMap<>(StatementService.groupByMonth(backdated));
+        System.out.println("8. Monthly statement:");
+        for (Map.Entry<YearMonth, List<Transaction>> entry : statement.entrySet())
+        {
+            System.out.println("      " + entry.getKey() + " -> " + entry.getValue().size() + " transaction(s)");
+        }
+
+        // 9. First and last month
+        System.out.println("9. First month: " + statement.firstKey() + " | last month: " + statement.lastKey());
+
+        // 10. All accounts by balance, largest first (Comparator passed as a parameter)
+        System.out.println("10. Accounts by balance:");
+        for (Account acc : service.getAllAccounts(Comparator.comparing(Account::getBalance).reversed()))
+        {
+            System.out.println("      " + acc);
+        }
+
+        // 11. All accounts by account number
+        System.out.println("11. Accounts by number:");
+        for (Account acc : service.getAllAccounts(Comparator.comparing(Account::getAccountNo)))
+        {
+            System.out.println("      " + acc);
+        }
+
+        // 12. Remove never-used accounts (Iterator.remove)
+        service.addAccount(new SavingsAccount("E001", "Empty One"));
+        service.addAccount(new CurrentAccount("E002", "Empty Two"));
+        int removed = service.removeEmptyAccounts();
+        int left = service.getAllAccounts(Comparator.comparing(Account::getAccountNo)).size();
+        System.out.println("12. Removed " + removed + " empty account(s) | accounts left: " + left);
+        try
+        {
+            service.findAccount("E001");
+            System.out.println("12. ERROR: E001 still exists");
+        }
+        catch (AccountNotFoundException e)
+        {
+            System.out.println("12. " + e.getMessage());
+        }
+
+        // 13. equals / hashCode: same account number = same account
+        Account first = new SavingsAccount("S001", "Aman", new BigDecimal("5000"));
+        Account second = new SavingsAccount("S001", "Someone Else", new BigDecimal("100"));
+        Set<Account> set = new HashSet<>();
+        set.add(first);
+        set.add(second);
+        System.out.println("13. equals: " + first.equals(second) + " | ==: " + (first == second)
+                + " | HashSet size: " + set.size());
+
+        // 14. Removing inside a for-each loop -> ConcurrentModificationException
+        List<String> ids = new ArrayList<>(List.of("S001", "E001", "S002", "E002"));
+        try
+        {
+            for (String id : ids)
+            {
+                if (id.startsWith("E"))
+                {
+                    ids.remove(id);
+                }
+            }
+            System.out.println("14. ERROR: no exception, list is " + ids);
+        }
+        catch (ConcurrentModificationException e)
+        {
+            System.out.println("14. ConcurrentModificationException caught | list is now: " + ids);
+        }
+
+        // 15. The safe way: Iterator.remove()
+        ids = new ArrayList<>(List.of("S001", "E001", "S002", "E002"));
+        Iterator<String> it = ids.iterator();
+        while (it.hasNext())
+        {
+            if (it.next().startsWith("E"))
+            {
+                it.remove();
+            }
+        }
+        System.out.println("15. Iterator.remove() | list is now: " + ids);
+
+        // 16. runM2Checks() and runM3Checks() above still print what they did before
+    }
+
+    // ==================== helpers ====================
+    private static void printTransactions(List<Transaction> transactions)
+    {
+        for (Transaction t : transactions)
+        {
+            System.out.println("      " + t);
+        }
+    }
+
+    private static Transaction backdatedTransaction(TransactionType type, String amount, LocalDateTime when)
+    {
+        return new Transaction.Builder()
+                .type(type)
+                .amount(new BigDecimal(amount))
+                .timeStamp(when)
+                .build();
     }
 }
