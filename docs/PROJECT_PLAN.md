@@ -61,10 +61,12 @@ InvalidAmountException (unchecked, extends RuntimeException)  ← contrast on pu
 | `HashMap<String, Account>` | accounts by account number | O(1) lookup |
 | `ArrayList<Transaction>` | history | ordered, indexed |
 | `TreeMap<YearMonth, List<Transaction>>` | monthly statement | keys come out sorted |
-| `HashSet<String>` | frozen accounts | fast `contains`, no duplicates |
+| `HashSet<String>` | accounts this account has transferred with | fast `contains`, no duplicates |
 | `ArrayDeque<Transaction>` | "last 5 transactions" widget | add at front, trim at the back |
-| `Comparator.comparing(...).thenComparing(...)` | sort history by amount, then date | |
-| `Iterator.remove()` | purge old pending entries safely | avoids `ConcurrentModificationException` |
+| `Comparator.comparing(...).thenComparing(...)` | sort history by amount, then by id (older first) | |
+| `Iterator.remove()` | remove never-used accounts safely | avoids `ConcurrentModificationException` |
+
+*(Updated in M4: frozen state lives on `Account` as a `boolean` since M2, so the `HashSet` is used for counterparties instead.)*
 
 - [ ] All of the above used somewhere real
 

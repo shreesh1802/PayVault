@@ -5,8 +5,7 @@ import com.payvault.model.Account;
 import com.payvault.util.Validator;
 
 import java.math.BigDecimal;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 public class WalletService
 {
@@ -26,6 +25,33 @@ public class WalletService
             throw new AccountNotFoundException(accountNo);
         }
         return account;
+    }
+
+    public List<Account> getAllAccounts(Comparator<Account> order)
+    {
+        List<Account> account = new ArrayList<>(accounts.values());
+
+        account.sort(order);
+
+        return account;
+    }
+
+    public int removeEmptyAccounts()
+    {
+        int removed = 0;
+        Iterator<Account> it = accounts.values().iterator();
+        while (it.hasNext())
+        {
+            Account account = it.next();
+            boolean noMoney = account.getBalance().compareTo(BigDecimal.ZERO) == 0;
+            boolean neverUsed = account.getHistory().isEmpty();
+            if (noMoney && neverUsed)
+            {
+                it.remove();
+                removed++;
+            }
+        }
+        return removed;
     }
 
     public void deposit(String accountNo, BigDecimal amount, String note) throws AccountNotFoundException, AccountFrozenException {

@@ -1,7 +1,6 @@
 package com.payvault.model;
 
 import com.payvault.exception.AccountFrozenException;
-import com.payvault.exception.AccountNotFoundException;
 import com.payvault.exception.DailyLimitExceededException;
 import com.payvault.exception.InsufficientBalanceException;
 import com.payvault.util.Validator;
@@ -9,10 +8,7 @@ import com.payvault.util.Validator;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 public abstract class Account {
     private final String accountNo;
@@ -42,6 +38,81 @@ public abstract class Account {
             recordTransaction(TransactionType.DEPOSIT, this.balance, "Opening Balance");
         }
     }
+
+    public List<Transaction> getRecentTransaction(int n)
+    {
+        Deque<Transaction> recent= new ArrayDeque<>();
+
+        for(Transaction t : history)
+        {
+            recent.addFirst(t);
+            if(recent.size() > n)
+            {
+                recent.removeLast();
+            }
+        }
+        return new ArrayList<>(recent);
+    }
+
+    public List<Transaction> getHistoryNewestFirst()
+    {
+        List<Transaction> sorted = new ArrayList<>(history);
+
+        sorted.sort(new Comparator<Transaction>()
+        {
+            @Override
+            public int compare(Transaction a, Transaction b)
+            {
+                return Long.compare(b.getId(), a.getId());
+            }
+        });
+        return sorted;
+    }
+
+    public List<Transaction> getHistoryByAmount()
+    {
+        List<Transaction> amount = new ArrayList<>(history);
+
+        amount.sort(Comparator.comparing(Transaction::getAmount).reversed().thenComparing(Transaction::getId));
+
+        return amount;
+    }
+
+    public Set<String> getCounterParties()
+    {
+        HashSet<String> CounterParties = new HashSet<>();
+        for (Transaction t : history)
+        {
+            if(t.getCounterparty() != null)
+            {
+                CounterParties.add(t.getCounterparty());
+            }
+        }
+        return CounterParties;
+    }
+
+    @Override
+    public boolean equals(Object o)
+    {
+        if (this == o)
+        {
+            return true;                     // the very same object
+        }
+        if (!(o instanceof Account))
+        {
+            return false;                    // null, or not an Account at all
+        }
+        Account other = (Account) o;
+        return accountNo.equals(other.accountNo);
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash(accountNo);
+    }
+
+
 
     public BigDecimal getTransferredToday()
     {
